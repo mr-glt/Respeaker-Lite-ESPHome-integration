@@ -32,6 +32,8 @@ substitutions:
 
 
 esphome:
+  name: respeaker-satellite
+  friendly_name: respeaker-satellite
   project: 
     name: formatbce.Respeaker Lite Satellite
     version: 2026.3.0
@@ -92,6 +94,8 @@ esp32:
       CONFIG_MBEDTLS_SSL_PROTO_TLS1_3: "y"  # TLS1.3 support isn't enabled by default in IDF 5.1.5
 
 wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
   id: wifi_id
   fast_connect: ${hidden_ssid}
   on_connect:

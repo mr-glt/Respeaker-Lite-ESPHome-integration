@@ -1,0 +1,85 @@
+blueprint:
+  name: "Respeaker Lite: Announce Timer Name & Siren"
+  description: "Speaks the name of the timer when it finishes, followed by a siren loop. Skips the name if the timer is unnamed."
+  domain: automation
+  input:
+    timer_ringing_switch:
+      name: Timer Ringing Switch
+      description: The switch from the satellite that turns on when a timer completes.
+      selector:
+        entity:
+          domain: switch
+    next_timer_name_sensor:
+      name: Next Timer Name Sensor
+      description: The text sensor that provides the name of the finishing timer.
+      selector:
+        entity:
+          domain: sensor
+    target_media_player:
+      name: Target Media Player
+      description: The media player entity of the Respeaker satellite.
+      selector:
+        entity:
+          domain: media_player
+    tts_entity:
+      name: TTS Service Entity
+      description: The text-to-speech entity to use (e.g. tts.piper).
+      selector:
+        entity:
+          domain: tts
+    tts_voice:
+      name: TTS Voice
+      description: The voice to use for the TTS announcement (e.g. en_US-hfc_male-medium). Leave blank if your TTS service does not require it.
+      default: "en_US-hfc_male-medium"
+      selector:
+        text: {}
+
+mode: single
+variables:
+  next_timer_name_sensor: !input next_timer_name_sensor
+  target_media_player_var: !input target_media_player
+  timer_name: "{{ states(next_timer_name_sensor) }}"
+
+trigger:
+  - platform: state
+    entity_id: !input timer_ringing_switch
+    from: "off"
+    to: "on"
+
+action:
+  - repeat:
+      while:
+        - condition: state
+          entity_id: !input timer_ringing_switch
+          state: "on"
+      sequence:
+        # Step A: Play the siren sound (This ALWAYS happens first)
+        - service: media_player.play_media
+          target:
+            entity_id: !input target_media_player
+          data:
+            media_content_id: "https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/timer_finished.flac"
+            media_content_type: "music"
+            
+        - delay: "00:00:01"
+        - wait_template: "{{ is_state(target_media_player_var, 'idle') }}"
+          timeout: "00:00:10"
+
+        # Step B: Speak the name ONLY if it has one!
+        - if:
+            - condition: template
+              value_template: >-
+                {{ timer_name not in ['unknown', 'unavailable', '', '-'] }}
+          then:
+            - service: tts.speak
+              target:
+                entity_id: !input tts_entity
+              data:
+                media_player_entity_id: !input target_media_player
+                message: "The {{ timer_name }} timer is done!"
+                options:
+                  voice: !input tts_voice
+                  
+            - delay: "00:00:02"
+            - wait_template: "{{ is_state(target_media_player_var, 'idle') }}"
+              timeout: "00:00:10"
